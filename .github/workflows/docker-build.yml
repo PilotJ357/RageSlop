@@ -1,4 +1,4 @@
-name: Docker Build & Push
+name: Five-Of-A-Kind image
 
 on:
   push:
@@ -18,7 +18,10 @@ permissions: {}
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  # Named for the app, not the repo: RageSlop is a monorepo, and this workflow builds
+  # only Five-Of-A-Kind. github.repository would give `rageslop`, which collides the
+  # moment a second project here needs an image.
+  IMAGE_NAME: ${{ github.repository_owner }}/five-of-a-kind
 
 jobs:
   build:
