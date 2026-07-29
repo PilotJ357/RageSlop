@@ -52,10 +52,14 @@ production build both pass.
   Docker CLI but no daemon. The nginx config and the `read_only` filesystem are
   reasoned-through but unverified — see "Verification performed" for exactly what was
   and was not checked.
-- Actions were pinned to the newest release **within the major already in use**
-  (checkout v4.4.0, login-action v3.7.0, metadata-action v5.10.0, build-push-action
-  v6.19.2), so this is a pure pinning change with no behavioural delta. Dependabot will
-  now propose the major bumps with CI to validate them.
+- Actions were first pinned within the major already in use, then bumped to the current
+  major (checkout v7.0.1, login-action v4.6.0, metadata-action v6.2.0, build-push-action
+  v7.3.0). The bump is not cosmetic: the previous majors all target the deprecated
+  Node 20 runtime, and the last run's log shows GitHub already force-migrating them —
+  `##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are
+  being forced to run on Node.js 24`. The current majors target Node 24 natively. Only
+  the four core inputs are used (`persist-credentials`; `registry`/`username`/`password`;
+  `images`/`tags`; `context`/`push`/`tags`/`labels`), all unchanged across these majors.
 - Not applied, and worth considering separately: build provenance and SBOM attestations
   (`provenance: true` / `sbom: true` on `build-push-action`), and a vulnerability scan
   step (Trivy/Grype) on the built image. These are additions rather than fixes to a
