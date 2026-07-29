@@ -1,6 +1,6 @@
 services:
   five-of-a-kind:
-    build: .
+    image: ghcr.io/pilotj357/rageslop:latest
     ports:
       - "5801:80"
     restart: unless-stopped
