@@ -1,6 +1,9 @@
 services:
   five-of-a-kind:
-    build: .
+    # Published by .github/workflows/docker-build.yml on every push to main.
+    # `latest` tracks main; pin to a `sha-<commit>` tag instead to freeze a version.
+    # To build from source rather than pull, swap this line for `build: .`.
+    image: ghcr.io/pilotj357/rageslop:latest
     ports:
       # Published on all interfaces so other devices on the LAN can reach the game.
       # Change to "127.0.0.1:5801:8080" to restrict it to this host only.
