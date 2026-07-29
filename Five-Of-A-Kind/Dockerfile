@@ -7,9 +7,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# nginx-unprivileged runs its master process as a non-root user; the stock nginx image
-# runs it as root. Consequence: it listens on 8080 instead of 80.
-FROM nginxinc/nginx-unprivileged:1.30.4-alpine@sha256:44e36330f74d4f3a1d4e222acca9e23b401fb87811a7597024502bb759c4dd49
+FROM nginx:1.30.4-alpine@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 8080
+EXPOSE 80
