@@ -3,8 +3,18 @@ name: Docker Build & Push
 on:
   push:
     branches: [main]
+    # Without this, `type=semver` below never matches and a `v1.2.3` tag builds nothing.
+    tags: ['v*.*.*']
   pull_request:
     branches: [main]
+
+# Two pushes in quick succession would otherwise race for the `latest` tag, and a
+# slow earlier run finishing last would leave `latest` pointing at the older commit.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
 
 env:
   REGISTRY: ghcr.io
@@ -22,18 +32,29 @@ jobs:
         working-directory: Five-Of-A-Kind
 
     steps:
-      - uses: actions/checkout@v4
+      # Actions are pinned to commit SHAs rather than tags. A tag is mutable: anyone
+      # who compromises the action's repo can repoint `v4` at code that then runs here
+      # with this job's token. Dependabot (.github/dependabot.yml) keeps the pins fresh.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Don't leave the job token behind in .git/config in the workspace.
+          persist-credentials: false
 
+      # Only authenticate when the build will actually publish. On a pull_request run
+      # this job compiles code that came from the PR, and there is no reason for
+      # registry credentials to be sitting in ~/.docker/config.json while that happens.
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        if: github.event_name == 'push'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
+          # Deterministic, unlike github.actor, which is the PR author on PR events.
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -42,7 +63,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: Five-Of-A-Kind
           push: ${{ github.event_name == 'push' }}

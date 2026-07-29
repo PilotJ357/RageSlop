@@ -1,0 +1,20 @@
+version: 2
+updates:
+  # The workflow pins actions to commit SHAs, which is only safe if something keeps
+  # them current. Dependabot rewrites the SHA and the trailing version comment together.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: npm
+    directory: /Five-Of-A-Kind
+    schedule:
+      interval: weekly
+
+  # Base images in the Dockerfile are digest-pinned for reproducibility; this picks up
+  # upstream rebuilds that patch the Alpine base.
+  - package-ecosystem: docker
+    directory: /Five-Of-A-Kind
+    schedule:
+      interval: weekly

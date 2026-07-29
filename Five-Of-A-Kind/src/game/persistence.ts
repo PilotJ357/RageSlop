@@ -1,26 +1,46 @@
 import type { GameState } from './types';
-import { TOTAL_ROUNDS } from './types';
+import { ALL_CATEGORIES, MAX_ROLLS_PER_TURN, TOTAL_ROUNDS } from './types';
 
 const STORAGE_KEY = 'five-of-a-kind-game';
+
+/** Whole numbers only — a fractional die has no pip pattern and no scoring meaning. */
+function isIntegerInRange(value: unknown, min: number, max: number): boolean {
+  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
+}
+
+/** A committed score is a finite number; `null` means the category is still open. */
+function isValidScore(value: unknown): boolean {
+  return value === null || (typeof value === 'number' && Number.isFinite(value));
+}
 
 function isValidGameState(value: unknown): value is GameState {
   if (typeof value !== 'object' || value === null) return false;
   const obj = value as Record<string, unknown>;
 
   if (!Array.isArray(obj.dice) || obj.dice.length !== 5) return false;
-  if (!obj.dice.every((d: unknown) => typeof d === 'number' && d >= 1 && d <= 6)) return false;
+  if (!obj.dice.every((d: unknown) => isIntegerInRange(d, 1, 6))) return false;
 
   if (!Array.isArray(obj.held) || obj.held.length !== 5) return false;
   if (!obj.held.every((h: unknown) => typeof h === 'boolean')) return false;
 
-  if (typeof obj.rollsUsed !== 'number' || obj.rollsUsed < 0 || obj.rollsUsed > 3) return false;
-  if (typeof obj.round !== 'number' || obj.round < 1 || obj.round > TOTAL_ROUNDS) return false;
+  if (!isIntegerInRange(obj.rollsUsed, 0, MAX_ROLLS_PER_TURN)) return false;
+  if (!isIntegerInRange(obj.round, 1, TOTAL_ROUNDS)) return false;
   if (typeof obj.phase !== 'string' || !['rolling', 'awaitingCommit', 'gameOver'].includes(obj.phase)) return false;
 
   if (typeof obj.scorecard !== 'object' || obj.scorecard === null) return false;
   const sc = obj.scorecard as Record<string, unknown>;
   if (typeof sc.scores !== 'object' || sc.scores === null) return false;
-  if (typeof sc.bonusCount !== 'number' || sc.bonusCount < 0) return false;
+
+  // Every category must be present and hold a number or null. Without this check a
+  // lookup returns `undefined`, which is neither open (`=== null`) nor filled: no
+  // category is playable, every commit is a no-op, and the game soft-locks.
+  const scores = sc.scores as Record<string, unknown>;
+  if (!ALL_CATEGORIES.every((category) => category in scores && isValidScore(scores[category]))) {
+    return false;
+  }
+
+  // At most one bonus per committed round, so the count cannot exceed the round count.
+  if (!isIntegerInRange(sc.bonusCount, 0, TOTAL_ROUNDS)) return false;
 
   return true;
 }

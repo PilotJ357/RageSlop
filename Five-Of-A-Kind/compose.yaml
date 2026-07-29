@@ -2,5 +2,19 @@ services:
   five-of-a-kind:
     build: .
     ports:
-      - "5801:80"
+      # Published on all interfaces so other devices on the LAN can reach the game.
+      # Change to "127.0.0.1:5801:8080" to restrict it to this host only.
+      # Container port is 8080, not 80 — see the Dockerfile's unprivileged nginx base.
+      - "5801:8080"
     restart: unless-stopped
+
+    # A static file server needs no writable filesystem and no capabilities.
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    pids_limit: 64

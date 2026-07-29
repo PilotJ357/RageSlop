@@ -8,3 +8,10 @@ tsconfig.tsbuildinfo
 compose.yaml
 Dockerfile
 .dockerignore
+
+# Vite inlines every VITE_-prefixed variable into the public bundle at build time, so
+# an env file reaching the build context would be baked into the shipped JavaScript.
+.env
+.env.*
+*.pem
+*.key

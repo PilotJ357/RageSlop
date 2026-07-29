@@ -17,20 +17,49 @@ The findings that matter are all in the CI/CD and packaging layer, where a publi
 with `pull_request` builds and floating action tags carries more supply-chain risk than
 the game code itself.
 
-| # | Severity | Area | Finding |
-|---|----------|------|---------|
-| 1 | Medium | Actions | Actions pinned to mutable tags, not commit SHAs |
-| 2 | Medium | Actions | GHCR credentials placed on the runner during untrusted PR builds |
-| 3 | Low | Actions | `persist-credentials` left at default on checkout |
-| 4 | Low | Actions | No `concurrency` group — a slow run can overwrite `latest` with a stale image |
-| 5 | Low | Docker | Base images use floating tags with no digest |
-| 6 | Low | Docker | No security response headers; nginx version disclosed |
-| 7 | Low | Docker | nginx master process runs as root |
-| 8 | Low | Compose | Published on all interfaces, no container hardening |
-| 9 | Low | App | `isValidGameState` does not validate scorecard contents — soft-locks the game |
-| 10 | Info | Actions | `type=semver` tag rule is dead — no tag trigger exists |
-| 11 | Info | Docker | `.dockerignore` has no `.env*` rule (Vite inlines `VITE_*` into public JS) |
-| 12 | Info | App | `Math.random()` for dice — fine here, noted for completeness |
+| # | Severity | Area | Finding | Status |
+|---|----------|------|---------|--------|
+| 1 | Medium | Actions | Actions pinned to mutable tags, not commit SHAs | Fixed |
+| 2 | Medium | Actions | GHCR credentials placed on the runner during untrusted PR builds | Fixed |
+| 3 | Low | Actions | `persist-credentials` left at default on checkout | Fixed |
+| 4 | Low | Actions | No `concurrency` group — a slow run can overwrite `latest` with a stale image | Fixed |
+| 5 | Low | Docker | Base images use floating tags with no digest | Fixed |
+| 6 | Low | Docker | No security response headers; nginx version disclosed | Fixed |
+| 7 | Low | Docker | nginx master process runs as root | Fixed |
+| 8 | Low | Compose | Published on all interfaces, no container hardening | Partly fixed |
+| 9 | Low | App | `isValidGameState` does not validate scorecard contents — soft-locks the game | Fixed |
+| 10 | Info | Actions | `type=semver` tag rule is dead — no tag trigger exists | Fixed |
+| 11 | Info | Docker | `.dockerignore` has no `.env*` rule (Vite inlines `VITE_*` into public JS) | Fixed |
+| 12 | Info | App | `Math.random()` for dice — fine here, noted for completeness | No action |
+
+### Fix status notes
+
+All findings were remediated in this branch except as noted below. Test count went from
+75 to 119 (`persistence.ts` had no coverage; it now has 44 tests). Typecheck and
+production build both pass.
+
+- **Finding 2** was fixed by gating the login step on `github.event_name == 'push'`, not
+  by the two-job split the finding suggested. On reflection the split buys almost
+  nothing here: fork PRs have their token downgraded to read-only by GitHub regardless
+  of the `permissions:` block, and a same-repo PR requires push access — an actor who
+  could already push to `main` and trigger the real publish path. The gated login is the
+  part that matters, and it keeps the workflow a single readable job.
+- **Finding 8** keeps the `0.0.0.0` port binding, since LAN access appears intentional
+  for a homelab deployment; the loopback alternative is documented in a comment. The
+  container hardening (`read_only`, `cap_drop`, `no-new-privileges`, resource limits)
+  was applied.
+- **Findings 6, 7, 8** could not be runtime-tested: the review environment has the
+  Docker CLI but no daemon. The nginx config and the `read_only` filesystem are
+  reasoned-through but unverified — see "Verification performed" for exactly what was
+  and was not checked.
+- Actions were pinned to the newest release **within the major already in use**
+  (checkout v4.4.0, login-action v3.7.0, metadata-action v5.10.0, build-push-action
+  v6.19.2), so this is a pure pinning change with no behavioural delta. Dependabot will
+  now propose the major bumps with CI to validate them.
+- Not applied, and worth considering separately: build provenance and SBOM attestations
+  (`provenance: true` / `sbom: true` on `build-push-action`), and a vulnerability scan
+  step (Trivy/Grype) on the built image. These are additions rather than fixes to a
+  flagged defect, so they were left out of the remediation.
 
 ## What the repo already gets right
 
@@ -367,8 +396,33 @@ uniform over 1..6, clamps a hypothetical `rng() === 1`, and the `|| 1` guards `N
   default branch `main`, 5 workflow runs — all `push` on `main`, all successful, no
   `pull_request` runs yet.
 - Wrote and ran a throwaway vitest suite against the real modules to confirm each claim in
-  finding 9 (soft-lock, string total, `Infinity`) rather than inferring it. Removed
-  afterward; the committed suite is unchanged and passes 75/75.
+  finding 9 (soft-lock, string total, `Infinity`) rather than inferring it. Those cases
+  are now permanent tests in `src/game/persistence.test.ts`.
+
+### Verified after the fixes
+
+- `npm test` — 119/119 pass. `npx tsc -b` — clean. `npm run build` — succeeds.
+- Checked the CSP against the actual build output rather than assuming: `dist/index.html`
+  emits no inline `<script>` and no inline `<style>`, only a same-origin module script and
+  a same-origin stylesheet. `script-src 'self'` and `style-src 'self'` are therefore
+  satisfied by the bundle, and `'unsafe-inline'` is needed solely for the runtime React
+  `style` attributes.
+- Parsed all three YAML files and asserted the resulting structure — triggers, job
+  permissions, and the `if:` condition on the login step.
+- Resolved every action SHA and both image digests from upstream at review time
+  (`git ls-remote` for the actions, the Docker Hub registry API for the images). None
+  were written from memory.
+
+### Not verified
+
+- **The container was never built or run.** The review environment has the Docker CLI but
+  no daemon, so `nginx.conf` syntax, the unprivileged base image swap, and the
+  `read_only: true` filesystem are reasoned-through but untested. `read_only` is the
+  likeliest to bite: nginx needs writable `/tmp` (its pid file) and `/var/cache/nginx`,
+  both provided as tmpfs. If the container fails to start, drop `read_only` and `tmpfs`
+  from `compose.yaml` — everything else is independent of it.
+- GHCR package visibility could not be changed programmatically; see the note in the
+  handover for why, and for the UI steps.
 
 ## Suggested order of work
 
