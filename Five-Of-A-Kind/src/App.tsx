@@ -19,6 +19,7 @@ import {
 } from './game/scoring';
 import { LOWER_CATEGORIES, TOTAL_ROUNDS, type Category, type GameState } from './game/types';
 import { appendScore, loadHistory, type HistoryEntry } from './history';
+import { clearGame, loadGame, saveGame } from './game/persistence';
 import { Die } from './ui/Die';
 import { Scorecard } from './ui/Scorecard';
 import { StatsDialog } from './ui/StatsDialog';
@@ -58,7 +59,7 @@ function wildNotice(state: GameState): string | null {
 }
 
 export function App() {
-  const [state, setState] = useState<GameState>(newGame);
+  const [state, setState] = useState<GameState>(() => loadGame() ?? newGame());
   const [rollingIndices, setRollingIndices] = useState<readonly number[]>([]);
   const [statsOpen, setStatsOpen] = useState(false);
   const [history, setHistory] = useState<readonly HistoryEntry[]>([]);
@@ -68,6 +69,8 @@ export function App() {
     setHistory(loadHistory());
     return () => clearTimeout(animationTimer.current);
   }, []);
+
+  useEffect(() => { saveGame(state); }, [state]);
 
   // Handlers stay outside the state updaters: an updater must be pure, and StrictMode
   // double-invokes it — a reroll or a localStorage write in there would run twice.
@@ -94,6 +97,7 @@ export function App() {
 
   const handleNewGame = () => {
     clearTimeout(animationTimer.current);
+    clearGame();
     setRollingIndices([]);
     setState(newGame());
   };
