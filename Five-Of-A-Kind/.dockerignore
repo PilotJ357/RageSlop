@@ -1,0 +1,10 @@
+node_modules
+dist
+docs
+.claude
+.git
+.gitignore
+tsconfig.tsbuildinfo
+compose.yaml
+Dockerfile
+.dockerignore

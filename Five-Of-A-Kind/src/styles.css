@@ -1,0 +1,31 @@
+/* Atomics from the design file's <helmet data-dc-atomics> block. */
+
+@keyframes dieFlip {
+  0% {
+    transform: rotateX(0) scale(1);
+  }
+  45% {
+    transform: rotateX(100deg) scale(0.88);
+  }
+  100% {
+    transform: rotateX(0) scale(1);
+  }
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: #1349b8;
+}
+
+a:hover {
+  color: #0a3a9e;
+}
+
+button:focus-visible,
+td:focus-visible {
+  outline: 2px solid #0a246a;
+  outline-offset: 1px;
+}

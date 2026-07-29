@@ -1,0 +1,6 @@
+services:
+  five-of-a-kind:
+    build: .
+    ports:
+      - "5801:80"
+    restart: unless-stopped
