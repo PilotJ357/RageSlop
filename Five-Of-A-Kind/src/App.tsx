@@ -82,8 +82,10 @@ export function App() {
     setState(rollDice(state));
   };
 
+  // `toggleHold` is pure, so it can read the queued state rather than this render's copy —
+  // taps that land faster than a re-render then stack instead of overwriting each other.
   const handleToggleHold = (index: number) => {
-    setState(toggleHold(state, index));
+    setState((current) => toggleHold(current, index));
   };
 
   const handleCommit = (category: Category) => {
@@ -196,7 +198,9 @@ export function App() {
               </span>
             </div>
 
-            <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+            {/* No gap: each Die pads itself out to the gap width so the space between
+                faces belongs to a tap target instead of falling through to the panel. */}
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
               {state.dice.map((value, index) => (
                 <Die
                   key={index}

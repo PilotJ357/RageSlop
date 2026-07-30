@@ -1,4 +1,5 @@
-import type { CSSProperties } from 'react';
+import { useRef } from 'react';
+import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react';
 import type { DieValue } from '../game/types';
 import { color } from './theme';
 
@@ -25,6 +26,52 @@ interface DieProps {
 }
 
 export function Die({ value, held, blank, rolling, disabled, onToggle }: DieProps) {
+  // Holds run off the pointer sequence instead of `click`, because a click is the least
+  // reliable way to hear about a tap: the browser drops it when press and release land on
+  // different elements (a fingertip or mouse drifting a few pixels), and it withholds it
+  // while deciding whether a quick second tap is a double-tap zoom. Tapping fast hits both
+  // cases, which is why holds felt like they went missing.
+  const pointerDown = useRef(false);
+  const swallowClick = useRef(false);
+
+  const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    if (disabled) return;
+    // Secondary mouse buttons never activate a button.
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    pointerDown.current = true;
+    swallowClick.current = true;
+    // Capturing retargets the release to this die even if the pointer has drifted off it.
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  // Guarding on `pointerDown` also collapses multi-touch: a second finger on the same die
+  // finds the flag already cleared and toggles nothing.
+  const handlePointerUp = () => {
+    if (!pointerDown.current) return;
+    pointerDown.current = false;
+    onToggle();
+  };
+
+  // The browser cancels the sequence once it claims the gesture for a scroll or a pinch.
+  // That is a page scroll the player happened to start on a die, not a hold.
+  const handlePointerCancel = () => {
+    pointerDown.current = false;
+  };
+
+  // Enter/Space arrive as a click with no pointer sequence behind it, so clear the guard
+  // first — otherwise a keyboard press could be eaten by a stale flag.
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') swallowClick.current = false;
+  };
+
+  const handleClick = () => {
+    if (swallowClick.current) {
+      swallowClick.current = false;
+      return;
+    }
+    onToggle();
+  };
+
   const pips = blank ? [] : PATTERNS[value];
   const pipColor = held ? color.heldInk : color.ink;
 
@@ -50,7 +97,11 @@ export function Die({ value, held, blank, rolling, disabled, onToggle }: DieProp
   return (
     <button
       type="button"
-      onClick={onToggle}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onKeyDown={handleKeyDown}
+      onClick={handleClick}
       disabled={disabled}
       aria-pressed={held}
       aria-label={`Die showing ${blank ? 'nothing' : value}${held ? ', held' : ''}`}
@@ -58,10 +109,16 @@ export function Die({ value, held, blank, rolling, disabled, onToggle }: DieProp
         appearance: 'none',
         background: 'none',
         border: 'none',
-        padding: 0,
+        // The padding is the gap between faces, so the tap target covers the whole space a
+        // die occupies rather than just its 46px face.
+        padding: 3,
         font: 'inherit',
         cursor: disabled ? 'default' : 'pointer',
         userSelect: 'none',
+        WebkitUserSelect: 'none',
+        // Opts out of double-tap-to-zoom, which is what makes a browser sit on a tap.
+        touchAction: 'manipulation',
+        WebkitTapHighlightColor: 'transparent',
       }}
     >
       <div style={face}>
